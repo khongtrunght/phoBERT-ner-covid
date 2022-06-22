@@ -18,7 +18,7 @@ parser.add_argument('--config', '-c',
 args = parser.parse_args()
 with open(args.filename, 'r') as f:
     try:
-        config = yaml.load()
+        config = yaml.load(f.read(), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
         exc.print_exc()
 
