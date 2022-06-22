@@ -1,8 +1,9 @@
 from turtle import forward
-from transformers import AutoConfig, AutoModel
+from transformers import AutoConfig, AutoModel, BertModel
 from torch import nn
 from torchcrf import CRF
 from transformers.modeling_outputs import TokenClassifierOutput
+from transformers.models.bert.modeling_bert import BertPreTrainedModel
 
 
 class RuleProcessor:
@@ -23,18 +24,23 @@ class RuleProcessor:
                     nn.init.constant_(crf.transitions[i, j], imp_value)
 
 
-class CustomNERCRF(nn.Module):
-    def __init__(self, checkpoint, num_labels, ignore_labels=-100):
-        super().__init__()
-        self.num_labels = num_labels
-        self.ignore_labels = ignore_labels
+class CustomNERCRF(BertPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.ignore_labels = config.ignore_labels
 
         # Load MOdel and get it body
-        self.model = AutoModel.from_pretrained(checkpoint, config=AutoConfig.from_pretrained(
-            checkpoint, output_attentions=True, output_hidden_states=True))
+        config.output_hidden_states = True
+        config.output_attentions = True
+
+        self.model = AutoModel.from_pretrained(
+            config._name_or_path, config=config)
+        # self.model = BertModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(0.1)
-        self.classifier = nn.Linear(self.model.config.hidden_size, num_labels)
-        self.crf = CRF(num_tags=num_labels, batch_first=True)
+        self.classifier = nn.Linear(
+            self.model.config.hidden_size, self.num_labels)
+        self.crf = CRF(num_tags=self.num_labels, batch_first=True)
 
     def _get_bert_features(self, input_ids, attention_mask):
         """get features from body of bert model
@@ -90,7 +96,7 @@ class CustomNERCRF(nn.Module):
 
         #  For testing
         else:
-            padding_mask =  attention_mask.eq(0)
+            padding_mask = attention_mask.eq(0)
             crf_out = self.crf.decode(bert_feats, mask=padding_mask)
             crf_loss = None
 
