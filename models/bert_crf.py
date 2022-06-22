@@ -28,7 +28,8 @@ class CustomNERCRF(BertPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.ignore_labels = config.ignore_labels
+        # self.ignore_labels = config.ignore_labels
+        self.ignore_labels = -100
 
         # Load MOdel and get it body
         config.output_hidden_states = True
