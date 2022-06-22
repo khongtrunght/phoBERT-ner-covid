@@ -61,7 +61,7 @@ elif config['model_params']['model_n_version'] == 'bert-crf':
     # hf_model = CustomNERCRF(checkpoint=config['model_params']['model_pretrain_path'],
     #                         num_labels=len(hf_dataset.labels),
 
-    config.device = "cuda"
+    config_bert.device = "cuda"
 
     hf_model = CustomNERCRF.from_pretrained(
         config['model_params']['model_pretrain_path'],
