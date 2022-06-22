@@ -52,7 +52,7 @@ if config['model_params']['model_n_version'] == 'bert-normal':
     hf_model.config.id2label = hf_dataset.id2label
     hf_model.config.label2id = hf_dataset.label2id
 elif config['model_params']['model_n_version'] == 'bert-crf':
-    config = AutoConfig.from_pretrained(
+    config_bert = AutoConfig.from_pretrained(
         config['model_params']['model_pretrain_path'],
         num_labels=len(hf_dataset.labels),
         id2label=hf_dataset.id2label,
@@ -65,7 +65,7 @@ elif config['model_params']['model_n_version'] == 'bert-crf':
 
     hf_model = CustomNERCRF.from_pretrained(
         config['model_params']['model_pretrain_path'],
-        config=config,
+        config=config_bert,
         cache_dir=config['model_params']['cache_dir'])
 
     rule_processor = RuleProcessor()
