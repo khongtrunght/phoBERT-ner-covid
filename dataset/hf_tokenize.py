@@ -1,7 +1,7 @@
 from datasets import load_metric
 import datasets
 from transformers import AutoTokenizer
-from covid19_dataset import COVID19Dataset
+from dataset.covid19_dataset import COVID19Dataset
 
 metric = load_metric("seqeval")
 logger = datasets.logging.get_logger(__name__)

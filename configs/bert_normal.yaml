@@ -1,0 +1,9 @@
+trainer_params:
+  max_epochs: 50
+  learning_rate: 0.00002
+  batch_size: 4
+
+model_params:
+  model_root_dir: "~/.phoner_covid19/models/hf"
+  model_n_version: "Bert_Normal"
+  model_pretrain_path: "vinai/phobert-base"
