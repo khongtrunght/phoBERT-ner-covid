@@ -5,5 +5,5 @@ trainer_params:
 
 model_params:
   model_root_dir: "~/.phoner_covid19/models/hf"
-  model_n_version: "Bert_Normal"
+  model_n_version: "bert-normal"
   model_pretrain_path: "vinai/phobert-base"
