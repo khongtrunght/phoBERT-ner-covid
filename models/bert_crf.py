@@ -140,6 +140,7 @@ class CustomNERCRF(pl.LightningModule):
             for seq_logits, seq_labels, seq_mask in zip(bert_feats, labels, mask):
                 # Index logits and labels using prediction mask to pass only the
                 # first subtoken of each word to CRF.
+                assert sum(seq_mask) != 0
                 seq_logits = seq_logits[seq_mask].unsqueeze(0)
                 seq_labels = seq_labels[seq_mask].unsqueeze(0)
                 loss -= self.crf(seq_logits, seq_labels,
@@ -198,14 +199,15 @@ class CustomNERCRF(pl.LightningModule):
         optimizer = torch.optim.AdamW(
             optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
 
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=self.hparams.warmup_steps,
-            num_training_steps=200
-        )
-        scheduler = {"scheduler": scheduler,
-                     "interval": "step", "frequency": 1}
-        return [optimizer], [scheduler]
+        # scheduler = get_linear_schedule_with_warmup(
+        #     optimizer=optimizer,
+        #     num_warmup_steps=self.hparams.warmup_steps,
+        #     num_training_steps=200
+        # )
+        # scheduler = {"scheduler": scheduler,
+        #              "interval": "step", "frequency": 1}
+        # return [optimizer], [scheduler]
+        return optimizer
 
     def training_step(self, train_batch, batch_idx):
         x = train_batch

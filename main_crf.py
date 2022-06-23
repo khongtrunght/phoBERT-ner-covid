@@ -88,7 +88,8 @@ class CustomDataCollator(DataCollatorForTokenClassification):
 
         batch = {k: torch.tensor(v, dtype=torch.int64)
                  for k, v in batch.items()}
-        batch[prediction_mask_name] = batch[prediction_mask_name].to(torch.bool)
+        batch[prediction_mask_name] = batch[prediction_mask_name].to(
+            torch.bool)
         return batch
 
 
@@ -118,6 +119,8 @@ model = CustomNERCRF(config['model_params']['model_pretrain_path'],
                      weight_decay=0.01,
                      )
 
+rule_processor = RuleProcessor()
+model.init_crf_transitions(rule_processor, labels_list=hf_dataset.labels)
 
 args_hf = TrainingArguments(
     f"test-ner",
