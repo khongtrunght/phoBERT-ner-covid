@@ -25,34 +25,42 @@ class HFTokenizer(object):
 
     def tokenize_and_align_labels(self,
                                   examples,
-                                  label_all_tokens=True):
+                                  label_all_tokens=False):
         tokenized_inputs = self._tokenizer(examples["tokens"],
                                            truncation=True,
                                            is_split_into_words=True,)
 
         labels = []
+        prediction_masks = []
         for i, label in enumerate(examples[f"ner_tags"]):
             word_ids = tokenized_inputs.word_ids(batch_index=i)
             previous_word_idx = None
             label_ids = []
+            prediction_mask = []
             for word_idx in word_ids:
                 # Special tokens have a word id that is None. We set the label to -100 so they are automatically
                 # ignored in the loss function.
                 if word_idx is None:
                     label_ids.append(-100)
+                    prediction_mask.append(False)
                 # We set the label for the first token of each word.
                 elif word_idx != previous_word_idx:
                     label_ids.append(label[word_idx])
+                    prediction_mask.append(True)
                 # For the other tokens in a word, we set the label to either the current label or -100, depending on
                 # the label_all_tokens flag.
                 else:
                     label_ids.append(
                         label[word_idx] if label_all_tokens else -100)
+                    prediction_mask.append(False)
                 previous_word_idx = word_idx
-
+            assert len(label_ids) == len(prediction_mask)
             labels.append(label_ids)
+            prediction_masks.append(prediction_mask)
 
         tokenized_inputs["labels"] = labels
+        tokenized_inputs["prediction_mask"] = prediction_masks
+
         return tokenized_inputs
 
 

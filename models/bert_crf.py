@@ -87,56 +87,76 @@ class CustomNERCRF(pl.LightningModule):
         """
         rule_processor.process(self.crf, labels_list, imp_value)
 
-    def forward(self, input_ids=None, attention_mask=None, labels=None):
-        """forward function of model
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                labels=None,
+                prediction_mask=None,
+                ):
+        """Performs the forward pass of the network.
+
+        If `labels` is not `None`, it will calculate and return the the loss,
+        that is the negative log-likelihood of the batch.
+        Otherwise, it will calculate the most probable sequence outputs using
+        Viterbi decoding and return a list of sequences (List[List[int]]) of
+        variable lengths.
 
         Args:
-            input_ids (tensor.IntegerTensor, optional): input_ids after tokenize and convert to ids. Defaults to None.
-            attention_mask (tensor.ByteTensor, optional): inpout attention_mask. Defaults to None.
-            labels (tensor.IntegerTensor, optional): labels when training. Defaults to None.
+            input_ids: tensor of input token ids.
+            attention_mask: mask tensor that should have value 0 for [PAD]
+                tokens and 1 for other tokens.
+            labels: tensor of gold NER tag label ids. Values should be ints in
+                the range [0, config.num_labels - 1].
+            prediction_mask: mask tensor should have value 0 for tokens that do
+                not have an associated prediction, such as [CLS] and WordPìece
+                subtoken continuations (that start with ##).
 
-        Returns:
-            TokenClassifierOuput: output of model
+        Returns a dict with calculated tensors:
+          - "logits"
+          - "loss" (if `labels` is not `None`)
+          - "y_pred" (if `labels` is `None`)
         """
-        labels_clone = labels.clone()
+
         bert_feats, bert_out = self._get_bert_features(
             input_ids, attention_mask)
 
-        # For training
+        outputs = {}
+        outputs['logits'] = bert_feats
+
+        mask = prediction_mask
+        batch_size = bert_feats.shape[0]
+
         if labels is not None:
-            # ignore_labels = -100
-            padding_mask = labels.ne(self.hparams.ignore_labels)
-            # padding_mask[:, 0] = 1  # first token must be in the mask
-            padding_mask = padding_mask[:, 1:]
+            # Negative of the log likelihood.
+            # Loop through the batch here because of 2 reasons:
+            # 1- the CRF package assumes the mask tensor cannot have interleaved
+            # zeros and ones. In other words, the mask should start with True
+            # values, transition to False at some moment and never transition
+            # back to True. That can only happen for simple padded sequences.
+            # 2- The first column of mask tensor should be all True, and we
+            # cannot guarantee that because we have to mask all non-first
+            # subtokens of the WordPiece tokenization.
+            loss = 0
+            for seq_logits, seq_labels, seq_mask in zip(bert_feats, labels, mask):
+                # Index logits and labels using prediction mask to pass only the
+                # first subtoken of each word to CRF.
+                seq_logits = seq_logits[seq_mask].unsqueeze(0)
+                seq_labels = seq_labels[seq_mask].unsqueeze(0)
+                loss -= self.crf(seq_logits, seq_labels,
+                                 reduction='token_mean')
 
-            # can not use -100 in tags, must convert to 0 and ignore
-            # labels = labels.clamp(min=0)
-
-            # ------------------------------------- label O is 20 --------------------------------------------------
-            labels_clone[labels == self.hparams.ignore_labels] = 20
-            # try to remove mask
-            # crf_out = self.crf.decode(bert_feats)
-            crf_out = self.crf.decode(bert_feats[:, 1:, :], mask=padding_mask)
-            # crf_out = [torch.tensor(i) for i in crf_out]
-            # crf_loss = self.crf(bert_feats, labels)
-            crf_loss = - \
-                self.crf(bert_feats[:, 1:, :],
-                         tags=labels_clone[:, 1:], mask=padding_mask)
-
-        #  For testing
+            loss /= batch_size
+            outputs['loss'] = loss
         else:
-            padding_mask = attention_mask.ne(0)
-            # crf_out = self.crf.decode(bert_feats)
-            # crf_out = [torch.tensor(i) for i in crf_out]
-            crf_out = self.crf.decode(bert_feats, mask=padding_mask)
-            crf_loss = None
+            output_tags = []
+            for seq_logits, seq_mask in zip(bert_feats, mask):
+                seq_logits = seq_logits[seq_mask].unsqueeze(0)
+                tags = self.crf.decode(seq_logits)
+                # Unpack "batch" results
+                output_tags.append(tags[0])
+            outputs['y_pred'] = output_tags
 
-        return TokenClassifierOutput(
-            loss=crf_loss,
-            logits=crf_out,
-            hidden_states=bert_out.hidden_states,
-            attentions=bert_out.attentions,
-        )
+        return outputs
 
     @property
     def label_name_list(self):
@@ -195,14 +215,28 @@ class CustomNERCRF(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         x = val_batch
-        outputs = self.forward(**x)
-        loss = outputs['loss']
+        input_ids = x['input_ids']
+        labels = x['labels']
+        prediction_mask = x['prediction_mask']
+        attention_mask = x['attention_mask']
+        outputs = self(
+            input_ids,
+            attention_mask,
+            prediction_mask=prediction_mask
+        )
+
+        # loss = outputs['loss']
+        y_pred = outputs['y_pred']
         true_labels_step = [
             [label for label in sent_label[1:]
                 if label != self.hparams.ignore_labels]
             for sent_label in x['labels'].tolist()
         ]
-        return {'val_loss': loss, "preds": outputs['logits'], "labels": true_labels_step, "attentions": outputs['attentions']}
+
+        for index, sent in enumerate(y_pred):
+            assert len(sent) == sum(prediction_mask[index])
+
+        return {"preds": y_pred, "labels": true_labels_step}
 
     def validation_epoch_end(self, outputs):
         # preds = np.concatenate([o['preds'] for o in outputs], axis=0)

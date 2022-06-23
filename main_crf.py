@@ -1,4 +1,5 @@
 
+from dataclasses import dataclass
 from pyparsing import col
 from torch.utils.data import DataLoader
 from argparse import ArgumentParser
@@ -44,7 +45,55 @@ tokenized_datasets = hf_dataset.dataset.map(
     hf_preprocessor.tokenize_and_align_labels, batched=True)
 
 
-data_collator = DataCollatorForTokenClassification(hf_preprocessor.tokenizer)
+@dataclass
+class CustomDataCollator(DataCollatorForTokenClassification):
+    def torch_call(self, features):
+        import torch
+
+        label_name = "label" if "label" in features[0].keys() else "labels"
+        prediction_mask_name = "prediction_mask" if "prediction_mask" in features[0].keys(
+        ) else "prediction_masks"
+        labels = [feature[label_name]
+                  for feature in features] if label_name in features[0].keys() else None
+        prediction_mask = [feature[prediction_mask_name]
+                           for feature in features] if prediction_mask_name in features[0].keys() else None
+        batch = self.tokenizer.pad(
+            features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            # Conversion to tensors will fail if we have labels as they are not of the same length yet.
+            return_tensors="pt" if labels is None else None,
+        )
+
+        if labels is None:
+            return batch
+
+        sequence_length = torch.tensor(batch["input_ids"]).shape[1]
+        padding_side = self.tokenizer.padding_side
+        if padding_side == "right":
+            batch[label_name] = [
+                list(label) + [self.label_pad_token_id] * (sequence_length - len(label)) for label in labels
+            ]
+            batch[prediction_mask_name] = [
+                list(prediction_mask) + [False] * (sequence_length - len(prediction_mask)) for prediction_mask in prediction_mask
+            ]
+        else:
+            batch[label_name] = [
+                [self.label_pad_token_id] * (sequence_length - len(label)) + list(label) for label in labels
+            ]
+            batch[prediction_mask_name] = [
+                 [False] * (sequence_length - len(prediction_mask)) + list(prediction_mask) for prediction_mask in prediction_mask
+            ]
+
+        batch = {k: torch.tensor(v, dtype=torch.int64)
+                 for k, v in batch.items()}
+        batch[prediction_mask_name] = batch[prediction_mask_name].to(torch.bool)
+        return batch
+
+
+# data_collator = DataCollatorForTokenClassification(hf_preprocessor.tokenizer)
+data_collator = CustomDataCollator(hf_preprocessor.tokenizer)
 
 
 # train_dataloader = DataLoader(
@@ -92,14 +141,6 @@ trainer_hf = Trainer(
         p=p, label_list=hf_dataset.labels,
         return_logits=config['model_params']['model_n_version'] == 'bert-normal')
 )
-
-
-class ComputeMetricCallback(pl.Callback):
-    def on_validation_batch_end(trainer, module, outputs):
-        vacc = outputs['']
-
-
-compute_metric_hook = pl.Callback()
 
 
 train_dataloader = trainer_hf.get_train_dataloader()
