@@ -3,3 +3,4 @@
 /vncorenlp
 test_notebook/
 __pycache__/
+lightning_logs/

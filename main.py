@@ -13,7 +13,7 @@ parser = ArgumentParser()
 parser.add_argument('--config', '-c',
                     dest='filename',
                     metavar='FILE',
-                    default='configs/bert_normal.yaml')
+                    default='configs/bert_crf.yaml')
 
 args = parser.parse_args()
 with open(args.filename, 'r') as f:
@@ -61,7 +61,7 @@ elif config['model_params']['model_n_version'] == 'bert-crf':
     # hf_model = CustomNERCRF(checkpoint=config['model_params']['model_pretrain_path'],
     #                         num_labels=len(hf_dataset.labels),
 
-    config_bert.device = "cuda"
+    config_bert.device = "cpu"
 
     hf_model = CustomNERCRF.from_pretrained(
         config['model_params']['model_pretrain_path'],
@@ -85,12 +85,14 @@ args = TrainingArguments(
     weight_decay=0.01,
 )
 
+hf_model.to("cpu")
+
 
 trainer = Trainer(
     hf_model,
     args,
-    train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["validation"],
+    train_dataset=tokenized_datasets["train"].select(range(4)),
+    eval_dataset=tokenized_datasets["validation"].select(range(4)),
     data_collator=data_collator,
     tokenizer=hf_preprocessor.tokenizer,
     compute_metrics=lambda p: compute_metrics(
