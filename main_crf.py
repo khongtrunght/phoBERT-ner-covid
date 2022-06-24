@@ -14,6 +14,8 @@ import pytorch_lightning as pl
 
 from utils import compute_metrics
 
+from pytorch_lightning.loggers import WandbLogger
+
 parser = ArgumentParser()
 parser.add_argument('--config', '-c',
                     dest='filename',
@@ -151,8 +153,11 @@ train_dataloader = trainer_hf.get_train_dataloader()
 eval_dataloader = trainer_hf.get_eval_dataloader()
 
 
+wandb_logger = WandbLogger(project='NER-CRF COVID-19')
+
 trainer = pl.Trainer(
     max_epochs=config['trainer_params']['max_epochs'],
+    logger=wandb_logger,
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)

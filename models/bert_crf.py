@@ -1,4 +1,5 @@
 from turtle import forward
+from typing import List
 import numpy as np
 import torch
 from transformers import (
@@ -213,7 +214,20 @@ class CustomNERCRF(pl.LightningModule):
         x = train_batch
         outputs = self.forward(**x)
         loss = outputs['loss']
+
+        # Log
+        self.log('train_loss', loss.item())
+
         return {"loss": loss}
+
+    def post_process(self, labels: torch.Tensor):
+        """ Process label to remove ingnored labels"""
+        true_labels_step = [
+            [label for label in sent_label[1:]
+                if label != self.hparams.ignore_labels]
+            for sent_label in labels.tolist()
+        ]
+        return true_labels_step
 
     def validation_step(self, val_batch, batch_idx):
         x = val_batch
@@ -229,11 +243,7 @@ class CustomNERCRF(pl.LightningModule):
 
         # loss = outputs['loss']
         y_pred = outputs['y_pred']
-        true_labels_step = [
-            [label for label in sent_label[1:]
-                if label != self.hparams.ignore_labels]
-            for sent_label in x['labels'].tolist()
-        ]
+        true_labels_step = self.post_process(labels)
 
         for index, sent in enumerate(y_pred):
             assert len(sent) == sum(prediction_mask[index])
@@ -246,5 +256,10 @@ class CustomNERCRF(pl.LightningModule):
         preds = list(itertools.chain(*[o['preds'] for o in outputs]))
         labels = list(itertools.chain(*[o['labels'] for o in outputs]))
 
-        compute_metrics((preds, labels), self.label_name_list,
-                        return_logits=False)
+        results = compute_metrics((preds, labels), self.label_name_list,
+                                  return_logits=False)
+
+        self.log('precision', results['precision'])
+        self.log('recall', results['recall'])
+        self.log('f1', results['f1'])
+        self.log('accuracy', results['accuracy'])
