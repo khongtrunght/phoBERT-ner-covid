@@ -138,8 +138,8 @@ args_hf = TrainingArguments(
 trainer_hf = Trainer(
     model,
     args_hf,
-    train_dataset=tokenized_datasets["train"].select(range(40)),
-    eval_dataset=tokenized_datasets["validation"].select(range(40)),
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
     data_collator=data_collator,
     tokenizer=hf_preprocessor.tokenizer,
     compute_metrics=lambda p: compute_metrics(
