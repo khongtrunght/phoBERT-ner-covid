@@ -152,12 +152,19 @@ train_dataloader = trainer_hf.get_train_dataloader()
 
 eval_dataloader = trainer_hf.get_eval_dataloader()
 
+test_dataloader = trainer_hf.get_test_dataloader(
+    test_dataset=tokenized_datasets["test"])
+
 
 wandb_logger = WandbLogger(project='NER-CRF COVID-19')
 
 trainer = pl.Trainer(
     max_epochs=config['trainer_params']['max_epochs'],
     logger=wandb_logger,
+    accelerator='gpu',
+    devices=1
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)
+
+trainer.test(dataloaders=test_dataloader)

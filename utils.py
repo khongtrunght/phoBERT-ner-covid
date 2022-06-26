@@ -25,9 +25,9 @@ def compute_metrics(p, label_list, return_logits=True):
     y_true = [l for prediction, label in zip(predictions, labels) for (
         p, l) in zip(prediction, label) if l not in (-100, 20)]
 
-    report = classification_report(y_true, y_pred, labels=range(
-        len(label_list) - 1), target_names=label_list[:-1], zero_division=0.0)
-    print(report)
+    # report = classification_report(y_true, y_pred, labels=range(
+    #     len(label_list) - 1), target_names=label_list[:-1], zero_division=0.0)
+    # print(report)
 
     # Remove ignored index (special tokens)
     true_predictions = [

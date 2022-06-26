@@ -1,6 +1,7 @@
 from turtle import forward
 from typing import List
 import numpy as np
+from sklearn.metrics import classification_report
 import torch
 from transformers import (
     AutoConfig,
@@ -13,6 +14,8 @@ from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.models.bert.modeling_bert import BertPreTrainedModel
 import pytorch_lightning as pl
 import itertools
+
+import wandb
 from utils import compute_metrics
 
 
@@ -250,16 +253,115 @@ class CustomNERCRF(pl.LightningModule):
 
         return {"preds": y_pred, "labels": true_labels_step}
 
+    def test_step(self, test_batch, batch_idx):
+        x = test_batch
+        input_ids = x['input_ids']
+        labels = x['labels']
+        prediction_mask = x['prediction_mask']
+        attention_mask = x['attention_mask']
+        outputs = self(
+            input_ids,
+            attention_mask,
+            prediction_mask=prediction_mask
+        )
+
+        # loss = outputs['loss']
+        y_pred = outputs['y_pred']
+        true_labels_step = self.post_process(labels)
+
+        for index, sent in enumerate(y_pred):
+            assert len(sent) == sum(prediction_mask[index])
+
+        # TODO : add text input and print prediction in test epoch end
+        return {"preds": y_pred, "labels": true_labels_step}
+
+    def test_epoch_end(self, outputs):
+        preds = list(itertools.chain(*[o['preds'] for o in outputs]))
+        labels = list(itertools.chain(*[o['labels'] for o in outputs]))
+
+        # results = compute_metrics((preds, labels), self.label_name_list,
+        #                           return_logits=False)
+
+        predictions, labels = preds, labels
+
+        y_pred = [p for prediction, label in zip(predictions, labels) for (
+            p, l) in zip(prediction, label) if l not in (-100, 20)]
+        y_true = [l for prediction, label in zip(predictions, labels) for (
+            p, l) in zip(prediction, label) if l not in (-100, 20)]
+
+        report = classification_report(y_true, y_pred, labels=range(
+            len(self.label_name_list) - 1), target_names=self.label_name_list[:-1], zero_division=0.0)
+        liststr = report.split('\n')
+        listtag = liststr[3:-5]
+        listavg = liststr[-4:-1]
+        item_names, precision, recall, f1, count = [], [], [], [], []
+        for val in listtag:
+            items = val.split()
+            item_names.append(items[0])
+            precision.append(items[1])
+            recall.append(items[2])
+            f1.append(items[3])
+            count.append(items[4])
+
+        for val in listavg:
+            items = val.split()
+            item_names.append('#'+items[0]+'_'+items[1])
+            precision.append(items[2])
+            recall.append(items[3])
+            f1.append(items[4])
+            count.append(items[5])
+
+        metrics = [item_names, precision, recall, f1, count]
+        self.logger.experiment.log({"Test Metrics": wandb.Table(
+            columns=['Name', 'Precision', 'Recall', 'F1', 'Count'],
+            data=list(map(list, zip(*metrics))))})
+
     def validation_epoch_end(self, outputs):
-        # preds = np.concatenate([o['preds'] for o in outputs], axis=0)
-        # labels = np.concatenate([o['labels'] for o in outputs], axis=0)
         preds = list(itertools.chain(*[o['preds'] for o in outputs]))
         labels = list(itertools.chain(*[o['labels'] for o in outputs]))
 
         results = compute_metrics((preds, labels), self.label_name_list,
                                   return_logits=False)
 
+        predictions, labels = preds, labels
+
+        y_pred = [p for prediction, label in zip(predictions, labels) for (
+            p, l) in zip(prediction, label) if l not in (-100, 20)]
+        y_true = [l for prediction, label in zip(predictions, labels) for (
+            p, l) in zip(prediction, label) if l not in (-100, 20)]
+
+        report = classification_report(y_true, y_pred, labels=range(
+            len(self.label_name_list) - 1), target_names=self.label_name_list[:-1], zero_division=0.0)
+        liststr = report.split('\n')
+        listtag = liststr[3:-5]
+        listavg = liststr[-4:-1]
+        item_names, precision, recall, f1, count = [], [], [], [], []
+        for val in listtag:
+            items = val.split()
+            item_names.append(items[0])
+            precision.append(items[1])
+            recall.append(items[2])
+            f1.append(items[3])
+            count.append(items[4])
+
+        for val in listavg:
+            items = val.split()
+            item_names.append('#'+items[0]+'_'+items[1])
+            precision.append(items[2])
+            recall.append(items[3])
+            f1.append(items[4])
+            count.append(items[5])
+
+        metrics = [item_names, precision, recall, f1, count]
+        self.logger.experiment.log({"Metrics": wandb.Table(
+            columns=['Name', 'Precision', 'Recall', 'F1', 'Count'],
+            data=list(map(list, zip(*metrics))))})
+
+        # Precision Recall
+        self.logger.experiment.log({"PR": wandb.plots.precision_recall(y_true, y_pred, labels=range(
+            len(self.label_name_list) - 1))})
+
         self.log('precision', results['precision'])
         self.log('recall', results['recall'])
         self.log('f1', results['f1'])
-        self.log('accuracy', results['accuracy'])
+        self.log('accuracy', results['accuracy'], prog_bar=True)
