@@ -44,12 +44,16 @@ class CustomNERCRF(pl.LightningModule):
                  learning_rate: float = 1e-5,
                  adam_epsilon: float = 1e-8,
                  warmup_steps: int = 0,
-                 weight_decay: float = 0.0,):
+                 weight_decay: float = 0.0,
+                 steps_per_epoch: int = None,
+                 n_epochs: int = None,):
         super().__init__()
         self.save_hyperparameters()
         # self.num_labels = num_labels
         # self.ignore_labels = config.ignore_labels
         self.hparams.ignore_labels = -100
+        self.steps_per_epoch = steps_per_epoch
+        self.n_epochs = n_epochs
 
         # Load MOdel and get it body
 
@@ -117,7 +121,7 @@ class CustomNERCRF(pl.LightningModule):
 
         Returns a dict with calculated tensors:
           - "logits"
-          - "loss" (if `labels` is not `None`)
+          - "loss"  get rid of (if `labels` is not `None`)
           - "y_pred" (if `labels` is `None`)
         """
 
@@ -141,6 +145,7 @@ class CustomNERCRF(pl.LightningModule):
             # cannot guarantee that because we have to mask all non-first
             # subtokens of the WordPiece tokenization.
             loss = 0
+            output_tags = []
             for seq_logits, seq_labels, seq_mask in zip(bert_feats, labels, mask):
                 # Index logits and labels using prediction mask to pass only the
                 # first subtoken of each word to CRF.
@@ -149,10 +154,14 @@ class CustomNERCRF(pl.LightningModule):
                 seq_labels = seq_labels[seq_mask].unsqueeze(0)
                 loss -= self.crf(seq_logits, seq_labels,
                                  reduction='token_mean')
+                tags = self.crf.decode(seq_logits)
+                output_tags.append(tags[0])
 
             loss /= batch_size
             outputs['loss'] = loss
+            outputs['y_pred'] = output_tags
         else:
+
             output_tags = []
             for seq_logits, seq_mask in zip(bert_feats, mask):
                 seq_logits = seq_logits[seq_mask].unsqueeze(0)
@@ -203,15 +212,20 @@ class CustomNERCRF(pl.LightningModule):
         optimizer = torch.optim.AdamW(
             optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
 
-        # scheduler = get_linear_schedule_with_warmup(
-        #     optimizer=optimizer,
-        #     num_warmup_steps=self.hparams.warmup_steps,
-        #     num_training_steps=200
-        # )
-        # scheduler = {"scheduler": scheduler,
-        #              "interval": "step", "frequency": 1}
-        # return [optimizer], [scheduler]
-        return optimizer
+        if self.steps_per_epoch is not None and self.n_epochs is not None:
+            # if we get info to build a scheduler, do it
+            num_warmup_steps = 10
+            num_train_steps = self.steps_per_epoch * self.n_epochs - num_warmup_steps
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer=optimizer,
+                num_warmup_steps=num_warmup_steps,
+                num_training_steps=num_train_steps
+            )
+            scheduler = {"scheduler": scheduler,
+                         "interval": "step", "frequency": 1}
+            return [optimizer], [scheduler]
+        else:
+            return optimizer
 
     def training_step(self, train_batch, batch_idx):
         x = train_batch
@@ -241,17 +255,18 @@ class CustomNERCRF(pl.LightningModule):
         outputs = self(
             input_ids,
             attention_mask,
-            prediction_mask=prediction_mask
+            prediction_mask=prediction_mask,
+            labels=labels
         )
 
-        # loss = outputs['loss']
+        loss = outputs['loss']
         y_pred = outputs['y_pred']
         true_labels_step = self.post_process(labels)
 
         for index, sent in enumerate(y_pred):
             assert len(sent) == sum(prediction_mask[index])
 
-        return {"preds": y_pred, "labels": true_labels_step}
+        return {"preds": y_pred, "labels": true_labels_step, 'val_loss': loss}
 
     def test_step(self, test_batch, batch_idx):
         x = test_batch
@@ -317,6 +332,7 @@ class CustomNERCRF(pl.LightningModule):
             data=list(map(list, zip(*metrics))))})
 
     def validation_epoch_end(self, outputs):
+        loss = torch.stack([o['val_loss'] for o in outputs]).mean()
         preds = list(itertools.chain(*[o['preds'] for o in outputs]))
         labels = list(itertools.chain(*[o['labels'] for o in outputs]))
 
@@ -357,11 +373,12 @@ class CustomNERCRF(pl.LightningModule):
             columns=['Name', 'Precision', 'Recall', 'F1', 'Count'],
             data=list(map(list, zip(*metrics))))})
 
-        # Precision Recall
-        self.logger.experiment.log({"PR": wandb.plots.precision_recall(y_true, y_pred, labels=range(
-            len(self.label_name_list) - 1))})
+        # # Precision Recall
+        # self.logger.experiment.log({"PR": wandb.plots.precision_recall(y_true, y_pred, labels=range(
+        #     len(self.label_name_list) - 1))})
 
         self.log('precision', results['precision'])
         self.log('recall', results['recall'])
         self.log('f1', results['f1'])
         self.log('accuracy', results['accuracy'], prog_bar=True)
+        self.log('val_loss', loss, prog_bar=True)

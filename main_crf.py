@@ -4,6 +4,7 @@ from pyparsing import col
 from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 from transformers import DataCollatorForTokenClassification, Trainer, TrainingArguments
+import wandb
 
 import yaml
 
@@ -21,6 +22,8 @@ parser.add_argument('--config', '-c',
                     dest='filename',
                     metavar='FILE',
                     default='configs/bert_crf.yaml')
+
+parser.add_argument('--name', '-n', type=str, default=None)
 
 args = parser.parse_args()
 with open(args.filename, 'r') as f:
@@ -119,6 +122,9 @@ model = CustomNERCRF(config['model_params']['model_pretrain_path'],
                      learning_rate=config['trainer_params']['learning_rate'],
                      warmup_steps=0,
                      weight_decay=0.01,
+                     steps_per_epoch=len(
+                         tokenized_datasets['train']),  # dang test
+                     n_epochs=config['trainer_params']['max_epochs'],
                      )
 
 rule_processor = RuleProcessor()
@@ -156,15 +162,20 @@ test_dataloader = trainer_hf.get_test_dataloader(
     test_dataset=tokenized_datasets["test"])
 
 
-wandb_logger = WandbLogger(project='NER-CRF COVID-19')
+wandb_logger = WandbLogger(project='NER-CRF COVID-19',
+                           name=args.name)
 
 trainer = pl.Trainer(
     max_epochs=config['trainer_params']['max_epochs'],
     logger=wandb_logger,
     accelerator='gpu',
-    devices=1
+    devices=1,
+    early_stop_callback=config['trainer_params']['early_stop_callback'],
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)
 
-trainer.test(dataloaders=test_dataloader)
+trainer.test(model, dataloaders=test_dataloader)
+
+trainer.save_checkpoint(f'BestModel{args.name}.pth')
+wandb.save(f'BestModel{args.name}.pth')
