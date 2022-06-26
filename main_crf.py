@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 from transformers import DataCollatorForTokenClassification, Trainer, TrainingArguments
 import wandb
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import yaml
 
@@ -170,7 +171,7 @@ trainer = pl.Trainer(
     logger=wandb_logger,
     accelerator='gpu',
     devices=1,
-    early_stop_callback=config['trainer_params']['early_stop_callback'],
+    callbacks=[EarlyStopping(monitor="val_loss", mode="min")],
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)
