@@ -9,4 +9,4 @@ model_params:
   model_n_version: "bert-crf"
   model_pretrain_path: "vinai/phobert-base"
   cache_dir: "~/.phoner_covid19/models/hf"
-  freeze_bert: True
+  freeze_bert: False
