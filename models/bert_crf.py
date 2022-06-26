@@ -46,7 +46,8 @@ class CustomNERCRF(pl.LightningModule):
                  warmup_steps: int = 0,
                  weight_decay: float = 0.0,
                  steps_per_epoch: int = None,
-                 n_epochs: int = None,):
+                 n_epochs: int = None,
+                 freeze_bert: bool = False,):
         super().__init__()
         self.save_hyperparameters()
         # self.num_labels = num_labels
@@ -63,6 +64,9 @@ class CustomNERCRF(pl.LightningModule):
         self.config.output_attentions = True
         self.model = AutoModel.from_pretrained(
             model_name_or_path, config=self.config)
+        if freeze_bert:
+            for param in self.model.parameters():
+                param.requires_grad = False
         # self.model = BertModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(0.1)
         self.classifier = nn.Linear(
