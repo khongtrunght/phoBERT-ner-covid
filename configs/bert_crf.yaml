@@ -2,7 +2,6 @@ trainer_params:
   max_epochs: 10
   learning_rate: 0.02
   batch_size: 16
-  early_stop_callback: True
 
 model_params:
   model_root_dir: "~/.phoner_covid19/models/hf"

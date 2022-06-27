@@ -17,6 +17,7 @@ import pytorch_lightning as pl
 from utils import compute_metrics
 
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 parser = ArgumentParser()
 parser.add_argument('--config', '-c',
@@ -164,15 +165,18 @@ test_dataloader = trainer_hf.get_test_dataloader(
     test_dataset=tokenized_datasets["test"])
 
 
-wandb_logger = WandbLogger(project='NER-CRF COVID-19',
+wandb_logger = WandbLogger(project='NLP NER-CRF COVID-19',
                            name=args.name)
+
+lr_monitor = LearningRateMonitor()
 
 trainer = pl.Trainer(
     max_epochs=config['trainer_params']['max_epochs'],
     logger=wandb_logger,
     accelerator='gpu',
     devices=1,
-    callbacks=[EarlyStopping(monitor="val_loss", mode="min")],
+    callbacks=[EarlyStopping(monitor="val_loss", mode="min"),
+               lr_monitor],
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)
