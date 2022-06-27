@@ -125,7 +125,7 @@ model = CustomNERCRF(config['model_params']['model_pretrain_path'],
                      warmup_steps=0,
                      weight_decay=0.01,
                      steps_per_epoch=len(
-                         tokenized_datasets['train']),  # dang test
+                         tokenized_datasets['train']) // config['trainer_params']['max_epochs'],  # dang test
                      n_epochs=config['trainer_params']['max_epochs'],
                      freeze_bert=config['model_params']['freeze_bert'],
                      )
