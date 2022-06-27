@@ -179,6 +179,23 @@ class COVID19Dataset(object):
         return self._dataset['validation']
 
 
+class RefineCOVID19Dataset(COVID19Dataset):
+    NAME = "PhoNER_COVID19"
+
+    def __init__(self):
+        cache_dir = os.path.join(str(Path.home()), '.phoner_covid19')
+        print("Cache dir: ", cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
+        download_config = datasets.DownloadConfig(cache_dir=cache_dir)
+        self._dataset = COVID19(cache_dir=cache_dir,
+                                url="https://raw.githubusercontent.com/ducphuE10/NER-Vietnamese-Covid-Dataset/main/train_data/",
+                                train_file="train_word_update.conll",
+                                )
+        print("Cache1 dir:", self._dataset.cache_dir)
+        self._dataset.download_and_prepare(download_config=download_config)
+        self._dataset = self._dataset.as_dataset()
+
+
 if __name__ == "__main__":
     dataset = COVID19Dataset().dataset
 
