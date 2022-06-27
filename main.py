@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.metrics import classification_report
 from dataset.hf_tokenize import HFTokenizer
 from transformers import AutoModelForTokenClassification, DataCollatorForTokenClassification, AutoTokenizer, TrainingArguments, Trainer
 from dataset.covid19_dataset import COVID19Dataset
@@ -9,15 +10,33 @@ from datasets import load_metric
 metric = load_metric("seqeval")
 
 
-def compute_metrics(p, label_list):
+def compute_metrics(p, label_list, return_logits=True):
+    """Compute metric in traning phase
+    Args:
+        p (tuple): (predictions, labels) in idx type
+        label_list (list[str]): label name list in str type
+    Returns:
+        dict: dictionary of metric
+    """
     predictions, labels = p
-    predictions = np.argmax(predictions, axis=2)
+    if return_logits:
+        predictions = np.argmax(predictions, axis=2)
+
+    y_pred = [p for prediction, label in zip(predictions, labels) for (
+        p, l) in zip(prediction, label) if l not in (-100, 20)]
+    y_true = [l for prediction, label in zip(predictions, labels) for (
+        p, l) in zip(prediction, label) if l not in (-100, 20)]
+
+    report = classification_report(y_true, y_pred, labels=range(
+        len(label_list) - 1), target_names=label_list[:-1], zero_division=0.0)
+    print(report)
 
     # Remove ignored index (special tokens)
     true_predictions = [
         [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
+
     true_labels = [
         [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
@@ -25,6 +44,7 @@ def compute_metrics(p, label_list):
 
     results = metric.compute(
         predictions=true_predictions, references=true_labels)
+
     return {
         "precision": results["overall_precision"],
         "recall": results["overall_recall"],
@@ -83,6 +103,9 @@ trainer = Trainer(
 
 trainer.train()
 trainer.evaluate()
+
+# test_dataloader = trainer.get_test_dataloader(tokenized_datasets["test"])
+# trainer.predict(test_dataloader)
 
 # Predictions on test dataset and evaluation
 
