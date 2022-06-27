@@ -218,7 +218,7 @@ class CustomNERCRF(pl.LightningModule):
 
         if self.steps_per_epoch is not None and self.n_epochs is not None:
             # if we get info to build a scheduler, do it
-            num_warmup_steps = 10
+            num_warmup_steps = (self.steps_per_epoch * self.n_epochs) // 100
             num_train_steps = self.steps_per_epoch * self.n_epochs - num_warmup_steps
             scheduler = get_linear_schedule_with_warmup(
                 optimizer=optimizer,

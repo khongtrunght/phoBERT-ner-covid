@@ -104,8 +104,6 @@ trainer = Trainer(
 trainer.train()
 trainer.evaluate()
 
-# test_dataloader = trainer.get_test_dataloader(tokenized_datasets["test"])
-# trainer.predict(test_dataloader)
 
 # Predictions on test dataset and evaluation
 
