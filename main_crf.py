@@ -9,7 +9,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import yaml
 
-from dataset.covid19_dataset import COVID19Dataset
+from dataset.covid19_dataset import COVID19Dataset, RefineCOVID19Dataset
 from dataset.hf_tokenize import HFTokenizer
 from models.bert_crf import CustomNERCRF, RuleProcessor
 import pytorch_lightning as pl
@@ -43,7 +43,8 @@ model_root_dir = config['model_params']['model_root_dir']
 
 
 hf_pretrained_tokenizer_checkpoint = config['model_params']['model_pretrain_path']
-hf_dataset = COVID19Dataset()
+# hf_dataset = COVID19Dataset()
+hf_dataset = RefineCOVID19Dataset()
 
 hf_preprocessor = HFTokenizer.init_vf(
     hf_pretrained_tokenizer_checkpoint=hf_pretrained_tokenizer_checkpoint)

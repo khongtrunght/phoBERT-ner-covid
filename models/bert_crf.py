@@ -311,7 +311,7 @@ class CustomNERCRF(pl.LightningModule):
         report = classification_report(y_true, y_pred, labels=range(
             len(self.label_name_list) - 1), target_names=self.label_name_list[:-1], zero_division=0.0)
         liststr = report.split('\n')
-        listtag = liststr[3:-5]
+        listtag = liststr[2:-5]
         listavg = liststr[-4:-1]
         item_names, precision, recall, f1, count = [], [], [], [], []
         for val in listtag:
@@ -353,7 +353,7 @@ class CustomNERCRF(pl.LightningModule):
         report = classification_report(y_true, y_pred, labels=range(
             len(self.label_name_list) - 1), target_names=self.label_name_list[:-1], zero_division=0.0)
         liststr = report.split('\n')
-        listtag = liststr[3:-5]
+        listtag = liststr[2:-5]
         listavg = liststr[-4:-1]
         item_names, precision, recall, f1, count = [], [], [], [], []
         for val in listtag:
