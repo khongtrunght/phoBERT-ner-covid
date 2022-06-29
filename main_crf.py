@@ -176,8 +176,7 @@ trainer = pl.Trainer(
     logger=wandb_logger,
     accelerator='gpu',
     devices=1,
-    callbacks=[EarlyStopping(monitor="val_loss", mode="min"),
-               lr_monitor],
+    callbacks=[lr_monitor],
 )
 
 trainer.fit(model, train_dataloader, eval_dataloader)
