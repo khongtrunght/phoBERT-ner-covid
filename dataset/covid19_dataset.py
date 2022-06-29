@@ -188,7 +188,7 @@ class RefineCOVID19Dataset(COVID19Dataset):
         os.makedirs(cache_dir, exist_ok=True)
         download_config = datasets.DownloadConfig(cache_dir=cache_dir)
         self._dataset = COVID19(cache_dir=cache_dir,
-                                url="https://raw.githubusercontent.com/ducphuE10/NER-Vietnamese-Covid-Dataset/main/train_data/",
+                                url="https://raw.githubusercontent.com/ducphuE10/NER-Vietnamese-Covid-Dataset/main/dataset/",
                                 train_file="train_word_aug_tuan_2.conll",
                                 )
         print("Cache1 dir:", self._dataset.cache_dir)

@@ -105,21 +105,6 @@ class CustomDataCollator(DataCollatorForTokenClassification):
 data_collator = CustomDataCollator(hf_preprocessor.tokenizer)
 
 
-# train_dataloader = DataLoader(
-#     tokenized_datasets['train'].select(range(4)),
-#     shuffle=True,
-#     batch_size=config['trainer_params']['batch_size'],
-#     collate_fn=data_collator
-# )
-
-# eval_dataloader = DataLoader(
-#     tokenized_datasets['validation'].select(range(4)),
-#     shuffle=False,
-#     batch_size=config['trainer_params']['batch_size'],
-#     collate_fn=data_collator
-# )
-
-
 model = CustomNERCRF(config['model_params']['model_pretrain_path'],
                      num_labels=len(hf_dataset.labels),
                      learning_rate=config['trainer_params']['learning_rate'],

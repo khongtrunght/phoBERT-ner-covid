@@ -20,6 +20,9 @@ from utils import compute_metrics
 
 
 class RuleProcessor:
+    """Class to specify the CRF rules
+    """
+
     def process(self, crf: CRF, labels_list, imp_value=-1e4):
         num_labels = len(labels_list)
         for i in range(num_labels):
